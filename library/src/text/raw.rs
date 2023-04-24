@@ -129,6 +129,7 @@ impl Synthesize for RawElem {
 }
 
 impl Show for RawElem {
+    #[tracing::instrument(name = "RawElem::show", skip_all)]
     fn show(&self, _: &mut Vt, styles: StyleChain) -> SourceResult<Content> {
         let text = self.text();
         let lang = self.lang(styles).as_ref().map(|s| s.to_lowercase());
@@ -202,12 +203,20 @@ impl Finalize for RawElem {
 impl LocalName for RawElem {
     fn local_name(&self, lang: Lang) -> &'static str {
         match lang {
+            Lang::ARABIC => "قائمة",
+            Lang::BOKMÅL => "Utskrift",
             Lang::CHINESE => "代码",
-            Lang::ITALIAN => "Codice",
-            Lang::RUSSIAN => "Листинг",
+            Lang::CZECH => "Seznam",
             Lang::FRENCH => "Liste",
+            Lang::GERMAN => "Listing",
+            Lang::ITALIAN => "Codice",
+            Lang::NYNORSK => "Utskrift",
+            Lang::POLISH => "Program",
+            Lang::RUSSIAN => "Листинг",
+            Lang::SLOVENIAN => "Program",
             Lang::UKRAINIAN => "Лістинг",
-            Lang::ENGLISH | Lang::GERMAN | _ => "Listing",
+            Lang::VIETNAMESE => "Chương trình", // TODO: This may be wrong.
+            Lang::ENGLISH | _ => "Listing",
         }
     }
 }
@@ -277,7 +286,7 @@ fn to_syn(RgbaColor { r, g, b, a }: RgbaColor) -> synt::Color {
 
 /// The syntect syntax definitions.
 static SYNTAXES: Lazy<syntect::parsing::SyntaxSet> =
-    Lazy::new(|| syntect::parsing::SyntaxSet::load_defaults_nonewlines());
+    Lazy::new(syntect::parsing::SyntaxSet::load_defaults_nonewlines);
 
 /// The default theme used for syntax highlighting.
 pub static THEME: Lazy<synt::Theme> = Lazy::new(|| synt::Theme {

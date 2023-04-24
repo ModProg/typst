@@ -99,6 +99,7 @@ pub struct BoxElem {
 }
 
 impl Layout for BoxElem {
+    #[tracing::instrument(name = "BoxElem::layout", skip_all)]
     fn layout(
         &self,
         vt: &mut Vt,
@@ -326,6 +327,7 @@ pub struct BlockElem {
 }
 
 impl Layout for BlockElem {
+    #[tracing::instrument(name = "BlockElem::layout", skip_all)]
     fn layout(
         &self,
         vt: &mut Vt,
@@ -362,6 +364,10 @@ impl Layout for BlockElem {
             pod.size.x = size.x;
             pod.expand = expand;
 
+            if expand.y {
+                pod.full = size.y;
+            }
+
             // Generate backlog for fixed height.
             let mut heights = vec![];
             if sizing.y.is_custom() {
@@ -373,6 +379,10 @@ impl Layout for BlockElem {
                     if Abs::zero().fits(remaining) {
                         break;
                     }
+                }
+
+                if let Some(last) = heights.last_mut() {
+                    *last += remaining;
                 }
 
                 pod.size.y = heights[0];

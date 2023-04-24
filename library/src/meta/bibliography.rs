@@ -43,7 +43,7 @@ use crate::text::TextElem;
 ///
 /// Display: Bibliography
 /// Category: meta
-#[element(Locatable, Synthesize, Show, LocalName)]
+#[element(Locatable, Synthesize, Show, Finalize, LocalName)]
 pub struct BibliographyElem {
     /// Path to a Hayagriva `.yml` or BibLaTeX `.bib` file.
     #[required]
@@ -66,6 +66,11 @@ pub struct BibliographyElem {
     ///   language]($func/text.lang) will be used. This is the default.
     /// - When set to `{none}`, the bibliography will not have a title.
     /// - A custom title can be set by passing content.
+    ///
+    /// The bibliography's heading will not be numbered by default, but you can
+    /// force it to be with a show-set rule:
+    /// `{show bibliography: set heading(numbering: "1.")}`
+    /// ```
     #[default(Some(Smart::Auto))]
     pub title: Option<Smart<Content>>,
 
@@ -91,7 +96,7 @@ cast_to_value! {
 impl BibliographyElem {
     /// Find the document's bibliography.
     pub fn find(introspector: Tracked<Introspector>) -> StrResult<Self> {
-        let mut iter = introspector.query(Self::func().select()).into_iter();
+        let mut iter = introspector.query(&Self::func().select()).into_iter();
         let Some(elem) = iter.next() else {
             return Err("the document does not contain a bibliography".into());
         };
@@ -106,7 +111,7 @@ impl BibliographyElem {
     /// Whether the bibliography contains the given key.
     pub fn has(vt: &Vt, key: &str) -> bool {
         vt.introspector
-            .query(Self::func().select())
+            .query(&Self::func().select())
             .into_iter()
             .flat_map(|elem| load(vt.world, &elem.to::<Self>().unwrap().path()))
             .flatten()
@@ -140,6 +145,7 @@ impl Synthesize for BibliographyElem {
 }
 
 impl Show for BibliographyElem {
+    #[tracing::instrument(name = "BibliographyElem::show", skip_all)]
     fn show(&self, vt: &mut Vt, styles: StyleChain) -> SourceResult<Content> {
         const COLUMN_GUTTER: Em = Em::new(0.65);
         const INDENT: Em = Em::new(1.5);
@@ -151,12 +157,7 @@ impl Show for BibliographyElem {
                     .spanned(self.span())
             });
 
-            seq.push(
-                HeadingElem::new(title)
-                    .with_level(NonZeroUsize::ONE)
-                    .with_numbering(None)
-                    .pack(),
-            );
+            seq.push(HeadingElem::new(title).with_level(NonZeroUsize::ONE).pack());
         }
 
         if !vt.introspector.init() {
@@ -198,16 +199,30 @@ impl Show for BibliographyElem {
     }
 }
 
+impl Finalize for BibliographyElem {
+    fn finalize(&self, realized: Content, _: StyleChain) -> Content {
+        realized.styled(HeadingElem::set_numbering(None))
+    }
+}
+
 impl LocalName for BibliographyElem {
     fn local_name(&self, lang: Lang) -> &'static str {
         match lang {
-            Lang::GERMAN | Lang::FRENCH => "Bibliographie",
+            Lang::ARABIC => "المراجع",
+            Lang::BOKMÅL => "Bibliografi",
             Lang::CHINESE => "参考文献",
+            Lang::CZECH => "Bibliografie",
+            Lang::FRENCH => "Bibliographie",
+            Lang::GERMAN => "Bibliographie",
             Lang::ITALIAN => "Bibliografia",
+            Lang::NYNORSK => "Bibliografi",
+            Lang::POLISH => "Bibliografia",
             Lang::PORTUGUESE => "Bibliografia",
             Lang::RUSSIAN => "Библиография",
+            Lang::SLOVENIAN => "Literatura",
             Lang::SPANISH => "Bibliografía",
             Lang::UKRAINIAN => "Бібліографія",
+            Lang::VIETNAMESE => "Tài liệu tham khảo",
             Lang::ENGLISH | _ => "Bibliography",
         }
     }
@@ -328,6 +343,7 @@ impl Synthesize for CiteElem {
 }
 
 impl Show for CiteElem {
+    #[tracing::instrument(name = "CiteElem::show", skip(self, vt))]
     fn show(&self, vt: &mut Vt, _: StyleChain) -> SourceResult<Content> {
         if !vt.introspector.init() {
             return Ok(Content::empty());
@@ -387,7 +403,7 @@ impl Works {
         let bibliography = BibliographyElem::find(vt.introspector)?;
         let citations = vt
             .introspector
-            .query(Selector::Any(eco_vec![
+            .query(&Selector::Or(eco_vec![
                 RefElem::func().select(),
                 CiteElem::func().select(),
             ]))
@@ -481,7 +497,7 @@ fn create(
                         &mut *citation_style,
                         &[Citation {
                             entry,
-                            supplement: supplement.is_some().then(|| SUPPLEMENT),
+                            supplement: supplement.is_some().then_some(SUPPLEMENT),
                         }],
                     )
                     .display;

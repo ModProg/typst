@@ -27,6 +27,7 @@ pub struct AttachElem {
 }
 
 impl LayoutMath for AttachElem {
+    #[tracing::instrument(skip(ctx))]
     fn layout_math(&self, ctx: &mut MathContext) -> SourceResult<()> {
         let base = self.base();
         let display_limits = base.is::<LimitsElem>();
@@ -34,14 +35,14 @@ impl LayoutMath for AttachElem {
 
         let base = ctx.layout_fragment(&base)?;
 
-        ctx.style(ctx.style.for_subscript());
+        ctx.style(ctx.style.for_superscript());
         let top = self
             .top(ctx.styles())
             .map(|elem| ctx.layout_fragment(&elem))
             .transpose()?;
         ctx.unstyle();
 
-        ctx.style(ctx.style.for_superscript());
+        ctx.style(ctx.style.for_subscript());
         let bottom = self
             .bottom(ctx.styles())
             .map(|elem| ctx.layout_fragment(&elem))
@@ -83,6 +84,7 @@ pub struct ScriptsElem {
 }
 
 impl LayoutMath for ScriptsElem {
+    #[tracing::instrument(skip(ctx))]
     fn layout_math(&self, ctx: &mut MathContext) -> SourceResult<()> {
         self.body().layout_math(ctx)
     }
@@ -105,6 +107,7 @@ pub struct LimitsElem {
 }
 
 impl LayoutMath for LimitsElem {
+    #[tracing::instrument(skip(ctx))]
     fn layout_math(&self, ctx: &mut MathContext) -> SourceResult<()> {
         self.body().layout_math(ctx)
     }
@@ -191,18 +194,18 @@ fn scripts(
 
     let mut frame = Frame::new(Size::new(width, ascent + descent));
     frame.set_baseline(ascent);
-    frame.push_frame(base_pos, base.to_frame());
+    frame.push_frame(base_pos, base.into_frame());
 
     if let Some(sup) = sup {
         let sup_pos =
             Point::new(sup_delta + base_width, ascent - shift_up - sup.ascent());
-        frame.push_frame(sup_pos, sup.to_frame());
+        frame.push_frame(sup_pos, sup.into_frame());
     }
 
     if let Some(sub) = sub {
         let sub_pos =
             Point::new(sub_delta + base_width, ascent + shift_down - sub.ascent());
-        frame.push_frame(sub_pos, sub.to_frame());
+        frame.push_frame(sub_pos, sub.into_frame());
     }
 
     ctx.push(FrameFragment::new(ctx, frame).with_class(class));
@@ -245,17 +248,17 @@ fn limits(
 
     let mut frame = Frame::new(Size::new(width, height));
     frame.set_baseline(base_pos.y + base.ascent());
-    frame.push_frame(base_pos, base.to_frame());
+    frame.push_frame(base_pos, base.into_frame());
 
     if let Some(top) = top {
         let top_pos = Point::with_x((width - top.width()) / 2.0 + delta);
-        frame.push_frame(top_pos, top.to_frame());
+        frame.push_frame(top_pos, top.into_frame());
     }
 
     if let Some(bottom) = bottom {
         let bottom_pos =
             Point::new((width - bottom.width()) / 2.0 - delta, height - bottom.height());
-        frame.push_frame(bottom_pos, bottom.to_frame());
+        frame.push_frame(bottom_pos, bottom.into_frame());
     }
 
     ctx.push(FrameFragment::new(ctx, frame).with_class(class));

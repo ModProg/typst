@@ -9,7 +9,7 @@ use crate::text::{LinebreakElem, SpaceElem, TextElem};
 
 /// A table of contents, figures, or other elements.
 ///
-/// This function generates a list of all occurances of an element in the
+/// This function generates a list of all occurrences of an element in the
 /// document, up to a given depth. The element's numbering and page number will
 /// be displayed in the outline alongside its title or caption. By default this
 /// generates a table of contents.
@@ -47,7 +47,7 @@ use crate::text::{LinebreakElem, SpaceElem, TextElem};
 ///
 /// Display: Outline
 /// Category: meta
-#[element(Show, LocalName)]
+#[element(Show, Finalize, LocalName)]
 pub struct OutlineElem {
     /// The title of the outline.
     ///
@@ -55,6 +55,11 @@ pub struct OutlineElem {
     ///   [text language]($func/text.lang) will be used. This is the default.
     /// - When set to `{none}`, the outline will not have a title.
     /// - A custom title can be set by passing content.
+    ///
+    /// The outline's heading will not be numbered by default, but you can
+    /// force it to be with a show-set rule:
+    /// `{show outline: set heading(numbering: "1.")}`
+    /// ```
     #[default(Some(Smart::Auto))]
     pub title: Option<Smart<Content>>,
 
@@ -131,6 +136,7 @@ pub struct OutlineElem {
 }
 
 impl Show for OutlineElem {
+    #[tracing::instrument(name = "OutlineElem::show", skip_all)]
     fn show(&self, vt: &mut Vt, styles: StyleChain) -> SourceResult<Content> {
         let mut seq = vec![ParbreakElem::new().pack()];
         // Build the outline title.
@@ -140,44 +146,37 @@ impl Show for OutlineElem {
                     .spanned(self.span())
             });
 
-            seq.push(
-                HeadingElem::new(title)
-                    .with_level(NonZeroUsize::ONE)
-                    .with_numbering(None)
-                    .with_outlined(false)
-                    .pack(),
-            );
+            seq.push(HeadingElem::new(title).with_level(NonZeroUsize::ONE).pack());
         }
 
         let indent = self.indent(styles);
         let depth = self.depth(styles).map_or(usize::MAX, NonZeroUsize::get);
+        let lang = TextElem::lang_in(styles);
 
         let mut ancestors: Vec<&Content> = vec![];
-        let elems = vt.introspector.query(self.target(styles));
+        let elems = vt.introspector.query(&self.target(styles));
 
         for elem in &elems {
             let Some(refable) = elem.with::<dyn Refable>() else {
                 bail!(elem.span(), "outlined elements must be referenceable");
             };
 
-            let location = elem.location().expect("missing location");
-            if depth < refable.level(StyleChain::default()) {
+            if depth < refable.level() {
                 continue;
             }
 
-            let Some(outline) = refable.outline(vt, StyleChain::default())? else {
+            let Some(outline) = refable.outline(vt, lang)? else {
                 continue;
             };
+
+            let location = elem.location().unwrap();
 
             // Deals with the ancestors of the current element.
             // This is only applicable for elements with a hierarchy/level.
             while ancestors
                 .last()
                 .and_then(|ancestor| ancestor.with::<dyn Refable>())
-                .map_or(false, |last| {
-                    last.level(StyleChain::default())
-                        >= refable.level(StyleChain::default())
-                })
+                .map_or(false, |last| last.level() >= refable.level())
             {
                 ancestors.pop();
             }
@@ -188,11 +187,9 @@ impl Show for OutlineElem {
                 for ancestor in &ancestors {
                     let ancestor_refable = ancestor.with::<dyn Refable>().unwrap();
 
-                    if let Some(numbering) =
-                        ancestor_refable.numbering(StyleChain::default())
-                    {
+                    if let Some(numbering) = ancestor_refable.numbering() {
                         let numbers = ancestor_refable
-                            .counter(StyleChain::default())
+                            .counter()
                             .at(vt, ancestor.location().unwrap())?
                             .display(vt, &numbering)?;
 
@@ -249,17 +246,32 @@ impl Show for OutlineElem {
     }
 }
 
+impl Finalize for OutlineElem {
+    fn finalize(&self, realized: Content, _: StyleChain) -> Content {
+        realized
+            .styled(HeadingElem::set_outlined(false))
+            .styled(HeadingElem::set_numbering(None))
+    }
+}
+
 impl LocalName for OutlineElem {
     fn local_name(&self, lang: Lang) -> &'static str {
         match lang {
+            Lang::ARABIC => "المحتويات",
+            Lang::BOKMÅL => "Innhold",
             Lang::CHINESE => "目录",
+            Lang::CZECH => "Obsah",
             Lang::FRENCH => "Table des matières",
             Lang::GERMAN => "Inhaltsverzeichnis",
             Lang::ITALIAN => "Indice",
+            Lang::NYNORSK => "Innhald",
+            Lang::POLISH => "Spis treści",
             Lang::PORTUGUESE => "Sumário",
             Lang::RUSSIAN => "Содержание",
+            Lang::SLOVENIAN => "Kazalo",
             Lang::SPANISH => "Índice",
             Lang::UKRAINIAN => "Зміст",
+            Lang::VIETNAMESE => "Mục lục",
             Lang::ENGLISH | _ => "Contents",
         }
     }

@@ -10,14 +10,28 @@ Spaced \
 Apart
 
 ---
-// Test box sizing.
-#box(width: 50pt, height: 50pt, fill: yellow, path(
-  fill: purple,
-  (0pt, 0pt),
-  (30pt, 30pt),
-  (0pt, 30pt),
-  (30pt, 0pt),
-))
+// Test block sizing.
+#set page(height: 120pt)
+#set block(spacing: 0pt)
+#block(width: 90pt, height: 80pt, fill: red)[
+  #block(width: 60%, height: 60%, fill: green)
+  #block(width: 50%, height: 60%, fill: blue)
+]
+
+---
+// Test box sizing with layoutable child.
+#box(
+  width: 50pt,
+  height: 50pt,
+  fill: yellow,
+  path(
+    fill: purple,
+    (0pt, 0pt),
+    (30pt, 30pt),
+    (0pt, 30pt),
+    (30pt, 0pt),
+  ),
+)
 
 ---
 // Test fr box.
