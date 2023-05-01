@@ -7,6 +7,7 @@ use ecow::{eco_vec, EcoVec};
 use hayagriva::io::{BibLaTeXError, YamlBibliographyError};
 use hayagriva::style::{self, Brackets, Citation, Database, DisplayString, Formatting};
 use hayagriva::Entry;
+use typst::util::option_eq;
 
 use super::{LinkElem, LocalName, RefElem};
 use crate::layout::{BlockElem, GridElem, ParElem, Sizing, TrackSizings, VElem};
@@ -152,10 +153,14 @@ impl Show for BibliographyElem {
 
         let mut seq = vec![];
         if let Some(title) = self.title(styles) {
-            let title = title.unwrap_or_else(|| {
-                TextElem::packed(self.local_name(TextElem::lang_in(styles)))
+            let title =
+                title.unwrap_or_else(|| {
+                    TextElem::packed(self.local_name(
+                        TextElem::lang_in(styles),
+                        TextElem::region_in(styles),
+                    ))
                     .spanned(self.span())
-            });
+                });
 
             seq.push(HeadingElem::new(title).with_level(NonZeroUsize::ONE).pack());
         }
@@ -206,10 +211,11 @@ impl Finalize for BibliographyElem {
 }
 
 impl LocalName for BibliographyElem {
-    fn local_name(&self, lang: Lang) -> &'static str {
+    fn local_name(&self, lang: Lang, region: Option<Region>) -> &'static str {
         match lang {
             Lang::ARABIC => "المراجع",
             Lang::BOKMÅL => "Bibliografi",
+            Lang::CHINESE if option_eq(region, "TW") => "書目",
             Lang::CHINESE => "参考文献",
             Lang::CZECH => "Bibliografie",
             Lang::FRENCH => "Bibliographie",
