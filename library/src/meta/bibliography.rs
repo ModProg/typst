@@ -357,13 +357,13 @@ impl Show for CiteElem {
 
         let works = Works::new(vt).at(self.span())?;
         let location = self.0.location().unwrap();
-        works
-            .citations
-            .get(&location)
-            .cloned()
-            .flatten()
-            .ok_or("bibliography does not contain this key")
-            .at(self.span())
+        if let Some(citation) = works.citations.get(&location).cloned().flatten() {
+            Ok(citation)
+        } else {
+            vt.potential_errors
+                .push(Err::<(), _>("bibliography does not contain this key").at(self.span()).unwrap_err());
+            Ok(Content::empty())
+        }
     }
 }
 

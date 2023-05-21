@@ -152,7 +152,14 @@ impl ParElem {
             expand: bool,
         ) -> SourceResult<Fragment> {
             let mut locator = Locator::chained(locator);
-            let mut vt = Vt { world, tracer, locator: &mut locator, introspector };
+            let mut errs = Vec::with_capacity(0);
+            let mut vt = Vt {
+                world,
+                potential_errors: &mut errs,
+                tracer,
+                locator: &mut locator,
+                introspector,
+            };
             let children = par.children();
 
             // Collect all text into one string for BiDi analysis.

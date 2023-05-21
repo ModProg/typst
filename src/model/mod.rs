@@ -18,6 +18,7 @@ use std::mem::ManuallyDrop;
 
 use comemo::{Track, Tracked, TrackedMut, Validate};
 
+use crate::diag::SourceError;
 use crate::diag::SourceResult;
 use crate::doc::Document;
 use crate::eval::Tracer;
@@ -45,13 +46,17 @@ pub fn typeset(
 
     // Relayout until all introspections stabilize.
     // If that doesn't happen within five attempts, we give up.
+    let mut potential_errors = Vec::new();
     loop {
         tracing::info!("Layout iteration {iter}");
+
+        potential_errors.clear();
 
         let constraint = <Introspector as Validate>::Constraint::new();
         let mut locator = Locator::new();
         let mut vt = Vt {
             world,
+            potential_errors: &mut potential_errors,
             tracer: TrackedMut::reborrow_mut(&mut tracer),
             locator: &mut locator,
             introspector: introspector.track_with(&constraint),
@@ -73,6 +78,16 @@ pub fn typeset(
         }
     }
 
+    if !potential_errors.is_empty() {
+        let errors =
+            potential_errors.drain(..).fold(Vec::new(), |mut acc, mut errors| {
+                acc.append(&mut errors);
+                acc
+            });
+
+        return Err(Box::new(errors));
+    }
+
     // Drop the introspector.
     ManuallyDrop::into_inner(introspector);
 
@@ -85,6 +100,8 @@ pub fn typeset(
 pub struct Vt<'a> {
     /// The compilation environment.
     pub world: Tracked<'a, dyn World + 'a>,
+    /// Potential errors that may happen during typesetting.
+    pub potential_errors: &'a mut Vec<Box<Vec<SourceError>>>,
     /// The tracer for inspection of the values an expression produces.
     pub tracer: TrackedMut<'a, Tracer>,
     /// Provides stable identities to elements.

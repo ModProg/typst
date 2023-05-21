@@ -130,6 +130,7 @@ impl Func {
         let mut locator = Locator::chained(vt.locator.track());
         let vt = Vt {
             world: vt.world,
+            potential_errors: vt.potential_errors,
             tracer: TrackedMut::reborrow_mut(&mut vt.tracer),
             locator: &mut locator,
             introspector: vt.introspector,
@@ -348,7 +349,14 @@ impl Closure {
 
         // Prepare VT.
         let mut locator = Locator::chained(locator);
-        let vt = Vt { world, tracer, locator: &mut locator, introspector };
+        let mut errs = Vec::with_capacity(0);
+        let vt = Vt {
+            world,
+            potential_errors: &mut errs,
+            tracer,
+            locator: &mut locator,
+            introspector,
+        };
 
         // Prepare VM.
         let mut vm = Vm::new(vt, route, closure.location, scopes);

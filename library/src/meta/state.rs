@@ -326,7 +326,14 @@ impl State {
         introspector: Tracked<Introspector>,
     ) -> SourceResult<EcoVec<Value>> {
         let mut locator = Locator::chained(locator);
-        let mut vt = Vt { world, tracer, locator: &mut locator, introspector };
+        let mut errs = Vec::with_capacity(0);
+        let mut vt = Vt {
+            world,
+            tracer,
+            potential_errors: &mut errs,
+            locator: &mut locator,
+            introspector,
+        };
         let mut state = self.init.clone();
         let mut stops = eco_vec![state.clone()];
 

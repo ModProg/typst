@@ -85,8 +85,10 @@ pub fn eval(
     // Prepare VT.
     let mut locator = Locator::default();
     let introspector = Introspector::default();
+    let mut errs = Vec::with_capacity(0);
     let vt = Vt {
         world,
+        potential_errors: &mut errs,
         tracer,
         locator: &mut locator,
         introspector: introspector.track(),
@@ -135,8 +137,10 @@ pub fn eval_string(
     let mut tracer = Tracer::default();
     let mut locator = Locator::default();
     let introspector = Introspector::default();
+    let mut errs = Vec::with_capacity(0);
     let vt = Vt {
         world,
+        potential_errors: &mut errs,
         tracer: tracer.track_mut(),
         locator: &mut locator,
         introspector: introspector.track(),

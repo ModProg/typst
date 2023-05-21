@@ -109,7 +109,14 @@ impl LayoutRoot for Content {
             styles: StyleChain,
         ) -> SourceResult<Document> {
             let mut locator = Locator::chained(locator);
-            let mut vt = Vt { world, tracer, locator: &mut locator, introspector };
+            let mut errs = Vec::with_capacity(0);
+            let mut vt = Vt {
+                world,
+                tracer,
+                potential_errors: &mut errs,
+                locator: &mut locator,
+                introspector,
+            };
             let scratch = Scratch::default();
             let (realized, styles) = realize_root(&mut vt, &scratch, content, styles)?;
             realized
@@ -153,8 +160,10 @@ pub trait Layout {
         regions: Regions,
     ) -> SourceResult<Fragment> {
         let mut locator = Locator::chained(vt.locator.track());
+        let mut errs = Vec::with_capacity(0);
         let mut vt = Vt {
             world: vt.world,
+            potential_errors: &mut errs,
             tracer: TrackedMut::reborrow_mut(&mut vt.tracer),
             locator: &mut locator,
             introspector: vt.introspector,
@@ -182,7 +191,14 @@ impl Layout for Content {
             regions: Regions,
         ) -> SourceResult<Fragment> {
             let mut locator = Locator::chained(locator);
-            let mut vt = Vt { world, tracer, locator: &mut locator, introspector };
+            let mut errs = Vec::with_capacity(0);
+            let mut vt = Vt {
+                world,
+                potential_errors: &mut errs,
+                tracer,
+                locator: &mut locator,
+                introspector,
+            };
             let scratch = Scratch::default();
             let (realized, styles) = realize_block(&mut vt, &scratch, content, styles)?;
             realized

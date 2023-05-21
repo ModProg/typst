@@ -417,7 +417,14 @@ impl Counter {
         introspector: Tracked<Introspector>,
     ) -> SourceResult<EcoVec<(CounterState, NonZeroUsize)>> {
         let mut locator = Locator::chained(locator);
-        let mut vt = Vt { world, tracer, locator: &mut locator, introspector };
+        let mut errs = Vec::with_capacity(0);
+        let mut vt = Vt {
+            world,
+            potential_errors: &mut errs,
+            tracer,
+            locator: &mut locator,
+            introspector,
+        };
         let mut state = CounterState(match &self.0 {
             // special case, because pages always start at one.
             CounterKey::Page => smallvec![1],
