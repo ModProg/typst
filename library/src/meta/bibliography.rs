@@ -367,8 +367,11 @@ impl Show for CiteElem {
         if let Some(citation) = works.citations.get(&location).cloned().flatten() {
             Ok(citation)
         } else {
-            vt.potential_errors
-                .push(Err::<(), _>("bibliography does not contain this key").at(self.span()).unwrap_err());
+            vt.potential_errors.push(
+                Err::<(), _>("bibliography does not contain this key")
+                    .at(self.span())
+                    .unwrap_err(),
+            );
             Ok(Content::empty())
         }
     }
