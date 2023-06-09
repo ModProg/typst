@@ -1,5 +1,3 @@
-pub use typst_macros::func;
-
 use std::fmt::{self, Debug, Formatter};
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
@@ -9,7 +7,8 @@ use ecow::eco_format;
 use once_cell::sync::Lazy;
 
 use super::{
-    cast_to_value, Args, CastInfo, Eval, Flow, Route, Scope, Scopes, Tracer, Value, Vm,
+    cast, Args, CastInfo, Eval, FlowEvent, IntoValue, Route, Scope, Scopes, Tracer,
+    Value, Vm,
 };
 use crate::diag::{bail, SourceResult, StrResult};
 use crate::model::{ElemFunc, Introspector, Locator, Vt};
@@ -119,10 +118,10 @@ impl Func {
 
     /// Call the function with a Vt.
     #[tracing::instrument(skip_all)]
-    pub fn call_vt(
+    pub fn call_vt<T: IntoValue>(
         &self,
         vt: &mut Vt,
-        args: impl IntoIterator<Item = Value>,
+        args: impl IntoIterator<Item = T>,
     ) -> SourceResult<Value> {
         let route = Route::default();
         let id = SourceId::detached();
@@ -234,13 +233,9 @@ impl From<&'static NativeFunc> for Func {
     }
 }
 
-impl<F> From<F> for Value
-where
-    F: Fn() -> &'static NativeFunc,
-{
-    fn from(f: F) -> Self {
-        Value::Func(f().into())
-    }
+cast! {
+    &'static NativeFunc,
+    self => Value::Func(self.into()),
 }
 
 /// Details about a function.
@@ -250,16 +245,16 @@ pub struct FuncInfo {
     pub name: &'static str,
     /// The display name of the function.
     pub display: &'static str,
-    /// A string of keywords.
+    /// A string of search keywords.
     pub keywords: Option<&'static str>,
+    /// Which category the function is part of.
+    pub category: &'static str,
     /// Documentation for the function.
     pub docs: &'static str,
     /// Details about the function's parameters.
     pub params: Vec<ParamInfo>,
-    /// Valid types for the return value.
-    pub returns: Vec<&'static str>,
-    /// Which category the function is part of.
-    pub category: &'static str,
+    /// Valid values for the return value.
+    pub returns: CastInfo,
     /// The function's own scope of fields and sub-functions.
     pub scope: Scope,
 }
@@ -312,6 +307,7 @@ pub(super) struct Closure {
     pub body: Expr,
 }
 
+/// A closure parameter.
 #[derive(Hash)]
 pub enum Param {
     /// A positional parameter: `x`.
@@ -370,7 +366,7 @@ impl Closure {
         // Parse the arguments according to the parameter list.
         let num_pos_params =
             closure.params.iter().filter(|p| matches!(p, Param::Pos(_))).count();
-        let num_pos_args = args.to_pos().len() as usize;
+        let num_pos_args = args.to_pos().len();
         let sink_size = num_pos_args.checked_sub(num_pos_params);
 
         let mut sink = None;
@@ -417,8 +413,8 @@ impl Closure {
         // Handle control flow.
         let result = closure.body.eval(&mut vm);
         match vm.flow {
-            Some(Flow::Return(_, Some(explicit))) => return Ok(explicit),
-            Some(Flow::Return(_, None)) => {}
+            Some(FlowEvent::Return(_, Some(explicit))) => return Ok(explicit),
+            Some(FlowEvent::Return(_, None)) => {}
             Some(flow) => bail!(flow.forbidden()),
             None => {}
         }
@@ -433,8 +429,9 @@ impl From<Closure> for Func {
     }
 }
 
-cast_to_value! {
-    v: Closure => Value::Func(v.into())
+cast! {
+    Closure,
+    self => Value::Func(self.into()),
 }
 
 /// A visitor that determines which variables to capture for a closure.
