@@ -1,5 +1,6 @@
 use once_cell::sync::Lazy;
 use syntect::highlighting as synt;
+use syntect::parsing::SyntaxSetBuilder;
 use typst::syntax::{self, LinkedNode};
 
 use super::{
@@ -138,6 +139,15 @@ impl RawElem {
                 )
             })
             .chain([("Typst", vec!["typ"]), ("Typst (code)", vec!["typc"])])
+            .chain(VHDL
+                .syntaxes()
+                .iter()
+                .map(|syntax| {
+                    (
+                        syntax.name.as_str(),
+                        syntax.file_extensions.iter().map(|s| s.as_str()).collect(),
+                    )
+                }))
             .collect()
     }
 }
@@ -179,7 +189,7 @@ impl Show for RawElem {
 
             Content::sequence(seq)
         } else if let Some(syntax) =
-            lang.and_then(|token| SYNTAXES.find_syntax_by_token(&token))
+            lang.as_ref().and_then(|token| SYNTAXES.find_syntax_by_token(&token))
         {
             let mut seq = vec![];
             let mut highlighter = syntect::easy::HighlightLines::new(syntax, &THEME);
@@ -190,6 +200,23 @@ impl Show for RawElem {
 
                 for (style, piece) in
                     highlighter.highlight_line(line, &SYNTAXES).into_iter().flatten()
+                {
+                    seq.push(styled(piece, foreground.into(), style));
+                }
+            }
+
+            Content::sequence(seq)
+        } else if lang.as_ref().map_or(false, |token| VHDL_LANGUAGES.contains(&&**token)) {
+            let syntax = VHDL.find_syntax_by_token(&lang.as_ref().unwrap()).unwrap();
+            let mut seq = vec![];
+            let mut highlighter = syntect::easy::HighlightLines::new(syntax, &THEME);
+            for (i, line) in text.lines().enumerate() {
+                if i != 0 {
+                    seq.push(LinebreakElem::new().pack());
+                }
+
+                for (style, piece) in
+                    highlighter.highlight_line(line, &VHDL).into_iter().flatten()
                 {
                     seq.push(styled(piece, foreground.into(), style));
                 }
@@ -339,6 +366,25 @@ fn to_syn(RgbaColor { r, g, b, a }: RgbaColor) -> synt::Color {
 /// ```
 static SYNTAXES: Lazy<syntect::parsing::SyntaxSet> = Lazy::new(|| {
     syntect::dumps::from_binary(include_bytes!("../../../assets/data/syntect.bin"))
+});
+
+const VHDL_LANGUAGES: &[ &str ] = &[ "vhdl", "systemverilog", "sv" ];
+static VHDL: Lazy<syntect::parsing::SyntaxSet> = Lazy::new(|| {
+    let mut builder = SyntaxSetBuilder::default();
+
+    builder.add(syntect::parsing::SyntaxDefinition::load_from_str(
+        include_str!("../../../assets/data/VHDL.sublime-syntax"),
+        false,
+        Some("vhdl"),
+    ).unwrap());
+
+    builder.add(syntect::parsing::SyntaxDefinition::load_from_str(
+        include_str!("../../../assets/data/SystemVerilog.sublime-syntax"),
+        false,
+        Some("systemverilog"),
+    ).unwrap());
+
+    builder.build()
 });
 
 /// The default theme used for syntax highlighting.
