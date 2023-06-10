@@ -155,15 +155,15 @@ impl Show for RefElem {
         let span = self.span();
 
         if BibliographyElem::has(vt, &target.0) {
-            if elem.is_ok() {
-                bail!(span, "label occurs in the document and its bibliography");
-            }
+            // if elem.is_ok() {
+            //     bail!(span, "label occurs in the document and its bibliography");
+            // }
 
             return Ok(self.to_citation(vt, styles)?.pack().spanned(span));
         }
 
         let elem = elem.at(span)?;
-        let refable = elem
+        let refable = match elem
             .with::<dyn Refable>()
             .ok_or_else(|| {
                 if elem.can::<dyn Figurable>() {
@@ -175,7 +175,11 @@ impl Show for RefElem {
                     eco_format!("cannot reference {}", elem.func().name())
                 }
             })
-            .at(span)?;
+            .at(span)
+        {
+            Ok(elem) => elem,
+            _ => return Ok(Content::empty()),
+        };
 
         let numbering = refable
             .numbering()

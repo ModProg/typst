@@ -96,12 +96,12 @@ impl BibliographyElem {
     pub fn find(introspector: Tracked<Introspector>) -> StrResult<Self> {
         let mut iter = introspector.query(&Self::func().select()).into_iter();
         let Some(elem) = iter.next() else {
-            return Err("the document does not contain a bibliography".into());
+            return Ok(Self(Content::empty()));
         };
 
-        if iter.next().is_some() {
-            Err("multiple bibliographies are not supported")?;
-        }
+        // if iter.next().is_some() {
+        //     Err("multiple bibliographies are not supported")?;
+        // }
 
         Ok(elem.to::<Self>().unwrap().clone())
     }
@@ -441,6 +441,9 @@ fn create(
     citations: Vec<CiteElem>,
 ) -> Arc<Works> {
     let span = bibliography.span();
+    if bibliography.0.is_empty() {
+        return Arc::new(Works::default());
+    }
     let entries = load(world, &bibliography.path()).unwrap();
     let style = bibliography.style(StyleChain::default());
     let bib_location = bibliography.0.location().unwrap();

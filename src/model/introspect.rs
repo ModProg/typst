@@ -322,7 +322,8 @@ impl Introspector {
             }
             found = Some(elem.clone());
         }
-        found.ok_or_else(|| "label does not exist in the document".into())
+        // found.ok_or_else(|| "label does not exist in the document".into())
+        Ok(Content::empty().into())
     }
 
     /// The total number pages.
